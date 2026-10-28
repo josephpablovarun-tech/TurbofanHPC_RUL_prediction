@@ -11,6 +11,22 @@ evaluation, MLflow tracking and registry, FastAPI serving, a Streamlit UI); the 
 
 Requirements: see `docs/Turbofan_RUL_Functional_Requirements.docx` (FRD v1.0).
 
+## What is being predicted? (in plain English)
+
+![Cutaway of a turbofan engine with the high pressure compressor highlighted](docs/images/hpc_location.png)
+
+*Simplified illustration, not to scale.*
+
+A jet engine pulls in air, squeezes it, burns fuel in it and pushes the hot gas out the back to create thrust. The part that does the hardest squeezing is the **high pressure compressor (HPC)**, highlighted in orange above. It sits just before the combustor, where fuel is burned.
+
+Because the HPC works under high heat, pressure and speed, its blades wear over time. As it wears, the engine has to work harder for the same thrust, and its sensors (temperatures, pressures, fan and core speeds, fuel flow) slowly drift.
+
+This project reads that drift. NASA's public **C-MAPSS FD001** dataset simulates 100 engines running until they fail from HPC wear, with 21 sensor readings logged every flight cycle. From an engine's sensor history up to today, the model estimates its **Remaining Useful Life (RUL)**: roughly how many more flight cycles it can run before it needs maintenance.
+
+Why it matters: an engine that is serviced too late is a safety and cost risk, and one serviced too early wastes useful life. A good estimate helps maintenance be planned instead of reactive.
+
+The data is simulated and the app is a learning project, not a maintenance tool. See the note above for how accurate the estimates are.
+
 ## Status
 
 | Area | Status |
