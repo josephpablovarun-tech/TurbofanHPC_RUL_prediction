@@ -1,49 +1,66 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) when working in this repository.
 
 ## Project
 
-Remaining Useful Life (RUL, in operating cycles) prediction for NASA C-MAPSS **FD001** turbofan data, built as an MLOps portfolio project. Educational demo on simulated data. Do not make performance claims until a model has actually been trained and evaluated.
+Remaining Useful Life (RUL, in operating cycles) prediction for NASA C-MAPSS **FD001** turbofan data: a portfolio project with a trained model, a tool-using agent and a Streamlit dashboard. Educational demo on simulated public data, not a maintenance decision system.
 
-Requirement IDs in docstrings and comments (`FR01`–`FR10`, `ML01`) refer to the FRD at `docs/Turbofan_RUL_Functional_Requirements.docx`. Keep tagging new code with the requirement it implements.
+Requirement IDs in docstrings and comments (`FR01`-`FR10`, `ML01`) refer to the FRD at `docs/Turbofan_RUL_Functional_Requirements.docx`. Tag new code with the requirement it implements.
 
-Roadmap (from README): Day 1 data/labels/split/validation (in progress) → Day 2 features, baseline, Random Forest, MLflow → Day 3 FastAPI (`api/`) → Day 4 Streamlit (`app/`) → Day 5 Docker Compose, CI. `api/`, `app/`, `docs/` are empty placeholders right now.
+## Status
+
+- Built: data pipeline (`pipelines/`, `src/`), trained models (`model_save/`: XGBoost primary with 400 trees and depth 7, Random Forest support with 300 trees), the agent and Streamlit dashboard (`Agent/`), Slack alerting, fleet scoring, tests and agent evals.
+- Planned, not built: FastAPI service (`api/`), MLflow tracking and registry, Docker Compose, CI, drift monitoring, retraining. `api/` and `app/` at the top level are empty placeholders. Do not describe these as done.
+- Headline metrics (see `Agent/docs/model_card.md`): on the 100 official test engines at their last cycle, MAE 14.6, RMSE 21.9, R2 0.72. Quote them only with that qualification; across all test rows MAE is about 31.
 
 ## Commands
 
-Run everything from the repo root. `configs/data.yaml` is read through a relative path, and the pipelines are run as modules.
+Run everything from the repo root (`configs/data.yaml` and `.streamlit/config.toml` are read relative to it).
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env                        # MLFLOW_TRACKING_URI, API_URL
+cp .env.example .env
 
-python -m pipelines.download_data           # or: --zip path/to/archive.zip (when the NASA URL fails)
-python -m pipelines.prepare_data            # writes to data/processed/
+python -m pipelines.download_data            # or: --zip path/to/archive.zip
+python -m pipelines.prepare_data             # writes to data/processed/
+python -m pipelines.simulate_fleet --out data/simulated   # optional batch CSVs for Fleet scoring
 
-pytest -q                                   # all tests
-pytest tests/test_labels.py -q              # one file
-pytest tests/test_splits.py::test_name -q   # one test
+python -m pytest Agent/tests -q              # agent, app, alerts, fleet, explorer tests
+pytest tests -q                              # data pipeline tests
+streamlit run Agent/app/app.py               # dashboard
 ```
 
-No linter or formatter is configured yet.
+Streamlit caches imported modules, so restart the app after code changes.
 
 ## Architecture
 
-Data flow: `download_data` → `data/raw/CMAPSS/` (FD001 files, readme, `checksums.json` with sha256) → `prepare_data` → `data/processed/` (`validation_report.json`, `split_manifest.json`, `train_labeled.parquet` or `.csv` depending on whether pyarrow is installed, `test_endpoints.csv`). Both `data/raw/` and `data/processed/` are git-ignored. Treat raw data as immutable.
+**Data layer (`src/`, `pipelines/`).** `download_data` writes `data/raw/CMAPSS/` (with sha256 checksums); `prepare_data` writes `data/processed/`. Both are git-ignored and raw data is immutable.
+- `schema.py`: fixed 26-column layout (`engine_id`, `cycle`, `setting_1..3`, `sensor_1..21`).
+- `data_loader.py`, `validation.py`: parse the headerless files and raise `DataValidationError` on hard failures. Gaps and constant columns are warnings. Rows are never dropped silently.
+- `labels.py`: training RUL = max cycle minus current cycle, uncapped. For test data the last observed cycle is not failure; true RUL comes from `RUL_FD001.txt` and is for evaluation only.
+- `splits.py`: train/validation split by whole engines, seeded from `configs/data.yaml`.
+- `predictor.py`, `features.py`, `rul_models.py`: 97 causal features, square-root target, XGBoost and Random Forest.
 
-`src/` holds the shared library that the pipelines and the future API/UI import:
-- `schema.py`: the fixed 26-column layout (`engine_id`, `cycle`, `setting_1..3`, `sensor_1..21`). Every other module depends on these constants.
-- `data_loader.py`: parses the whitespace-separated, headerless files. Trailing columns are dropped **only if they are entirely empty**. Otherwise it raises `DataValidationError`.
-- `validation.py`: `validate_raw` raises `DataValidationError` (which carries an `.errors` list) on hard failures: missing columns, non-finite values, non-positive ids, duplicate `(engine_id, cycle)` keys, cycles that don't strictly increase. Cycle gaps and constant columns are reported as warnings, not errors. Rows are never dropped silently.
-- `labels.py`: Training RUL = the engine's max cycle minus the current cycle, **uncapped** (FR06). For test data, the last observed cycle is **not** failure. `build_test_endpoint_labels` gives one labeled row per engine from `RUL_FD001.txt`. `add_test_trajectory_rul` produces per-row test truth for analysis only (FR10).
-- `splits.py`: train/validation split by **whole engines** (never by row, which would leak), seeded by `configs/data.yaml` (`seed`, `val_fraction`), and persisted as a JSON manifest.
+**Agent layer (`Agent/`).**
+- `orchestration/`: supervisor (regex routing), engine and document agents, tool allowlists, call budget, validator, deterministic mode and optional Ollama LLM mode (numbers checked against tools).
+- `tools/`: `datastore.py` (data access with the cutoff enforced), `tools.py` (tool suite), `life_view.py` (train-engine life view), `explore.py`, `fleet_upload.py`, `alerts.py` (Slack).
+- `app/`: `app.py` (RUL agent view), `explorer.py` (Data explorer), `fleet.py` (Fleet scoring), `charts.py`.
+- `schemas/contracts.py`: typed contracts. `configs/agent.yaml`: agent, alert and data settings.
 
-All dataset policy (paths, seed, val fraction, schema and parser versions, download URL) lives in `configs/data.yaml`. Add new policy there rather than hard-coding it.
+## Rules that must hold
 
-Tests use synthetic histories from `tests/conftest.py::make_history({engine_id: n_cycles})`. The conftest also puts the repo root on `sys.path`, so they don't need the real NASA data.
+- **No leakage past the cutoff.** The cutoff is enforced in the data layer and the feature builder. Tools take no cutoff argument, and the agent code must never reach the official test labels. Only train engines may be read past the cutoff, and then labelled retrospective.
+- **Never commit or print the Slack webhook.** `SLACK_WEBHOOK_URL` is set only in the terminal environment that runs Streamlit. Without it, alerts run in dry-run mode.
+- **Alerts fire once per crossing** of 80% estimated life used (re-arm below 75%), per split, engine and model version. Fleet scoring posts one summary per file and model version.
+- **Describe sensor links as association, not cause.** The models give point estimates with no calibrated uncertainty.
+- Add dataset policy to `configs/data.yaml` rather than hard-coding it.
 
-## EDA notebook
+## Tests
 
-`EDA/01_fd001_eda.ipynb` is self-contained. It reimplements loading, validation, labeling and the engine split inline instead of importing `src/`. Its split uses `N_VALIDATION_ENGINES`, not `split_manifest.json`, so its engine sets can differ from the pipeline's. It reads data from `FD001_DATA_DIR` or `data/raw/`. It needs matplotlib, which is not in `requirements.txt`. Its conclusions (constant columns to drop, sensors to keep, causal rolling features over windows of 5 and 10 with `min_periods=1` and `ddof=0`) are meant to feed into the Day 2 feature work.
+`Agent/tests/` uses synthetic fixtures from `conftest.py` (including a synthetic `RUL_FD001.txt`, with alerts disabled), so the suite runs without the NASA data. `tests/` holds the pipeline tests built on `make_history({engine_id: n_cycles})`. `Agent/evals/run.py` runs the 20 agent evals.
+
+## Notebooks
+
+`EDA/01_fd001_eda.ipynb` is self-contained and reimplements loading, validation and the split inline; its engine sets can differ from the pipeline's. `model/` holds tuning and evaluation notebooks.
