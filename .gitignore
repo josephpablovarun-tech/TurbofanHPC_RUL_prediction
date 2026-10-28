@@ -1,0 +1,36 @@
+# Environments and secrets
+.venv/
+venv/
+.env
+*.pem
+
+# Data and artifacts (keep local; small fixtures are allowed)
+data/raw/
+data/processed/
+data/*.zip
+artifacts/
+mlruns/
+mlflow.db
+*.sqlite
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+*.egg-info/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Agent runtime output
+Agent/logs/
+
+# Simulated fleet batches: regenerate with `python -m pipelines.simulate_fleet`
+data/simulated/*.csv
+data/simulated/truth/
+Agent/evals/results/
+data/csv_preview/

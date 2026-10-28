@@ -1,0 +1,48 @@
+# Agent configuration. Paths are relative to the repo root (TurbofanHPC_RUL_prediction/).
+# Environment overrides: OLLAMA_HOST (base_url), OLLAMA_MODEL (model).
+model:
+  model_dir: model_save
+  primary: xgboost          # serving model
+  support: random_forest    # second opinion, shown as "model agreement"
+
+data:
+  raw_dir: data/raw/CMAPSS
+  train: train_FD001.txt
+  test: test_FD001.txt
+  rul: RUL_FD001.txt        # official true RUL of each test engine at its last cycle (evaluation display only; never given to the model or the chat agent)
+
+retrieval:
+  docs_dir: Agent/docs
+  top_k: 4
+
+metrics_file: Agent/configs/model_metrics.json
+
+llm:
+  base_url: http://localhost:11434
+  model: qwen2.5:7b         # run `ollama pull qwen2.5:7b`; any Ollama model with tool calling works
+  temperature: 0
+  seed: 42
+  request_timeout_s: 90
+
+limits:
+  tool_budget: 5            # executed tool calls per request, across both specialists, retries included
+  tool_timeout_s: 20
+  deadline_s: 120           # end-to-end deadline per request
+  max_agent_steps: 4        # LLM tool-calling rounds per specialist
+
+thresholds:
+  short_history_cycles: 75      # heuristic: several of the largest test endpoint errors had 31-72 observed cycles
+  trend_window_default: 30
+  agreement_close_cycles: 5     # uncalibrated heuristic on |XGBoost - Random Forest|
+  agreement_wide_cycles: 15
+  band_normal_above: 50         # illustrative demo bands (FRD UI02), not aviation limits
+  band_watch_above: 20
+
+alerts:
+  enabled: true
+  life_used_threshold: 0.80   # alert when estimated life used = cycle / (cycle + predicted RUL) reaches this
+  rearm_below: 0.75           # ... once per crossing; re-armed only after the estimate falls below this
+  webhook_env: SLACK_WEBHOOK_URL   # environment variable holding the Slack incoming-webhook URL (never commit it). Unset = dry-run, nothing is sent.
+
+logging:
+  trace_file: Agent/logs/traces.jsonl

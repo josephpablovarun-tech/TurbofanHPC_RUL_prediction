@@ -1,0 +1,14 @@
+# Versioned data policy (FRD FR01-FR03)
+dataset_id: FD001
+schema_version: "1.0"
+parser_version: "0.1.0"
+seed: 42
+val_fraction: 0.2
+raw_dir: data/raw/CMAPSS
+processed_dir: data/processed
+files:
+  train: train_FD001.txt
+  test: test_FD001.txt
+  test_rul: RUL_FD001.txt
+# Override if the NASA URL changes. Verify against the NASA PCoE repository page.
+download_url: "https://phm-datasets.s3.amazonaws.com/NASA/6.+Turbofan+Engine+Degradation+Simulation+Data+Set.zip"

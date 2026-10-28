@@ -1,0 +1,14 @@
+# Day 1 dependencies. After installing, run: pip freeze > requirements.lock
+# (FRD ML01: pin and verify compatible versions during implementation.)
+pandas>=2.2,<3
+numpy>=1.26,<3
+matplotlib>=3.8,<4
+pyyaml>=6
+pytest>=8
+
+# Agent layer
+scikit-learn==1.6.1
+xgboost==2.1.4
+joblib>=1.4
+pydantic>=2.6,<3
+streamlit>=1.30

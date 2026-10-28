@@ -1,0 +1,5 @@
+[server]
+maxUploadSize = 10   # MB: matches the 10 MB limit the Fleet scoring import enforces
+
+[browser]
+gatherUsageStats = false
