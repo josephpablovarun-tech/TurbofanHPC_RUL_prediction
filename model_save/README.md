@@ -6,7 +6,7 @@ Tuned models from `model/03_model_tuning.ipynb`, each trained on the 70 training
 |---|---|
 | `logistic_regression_bands.joblib` | Logistic Regression on 10-cycle bands |
 | `random_forest.joblib` | Random Forest, 300 trees |
-| `xgboost.joblib` | XGBoost, 800 trees, square-root target |
+| `xgboost.joblib` | XGBoost, 400 trees, max depth 7, square-root target |
 
 Each file is a dictionary with the fitted `model`, its `features` (column names, in order), the `target` form, the tuned `settings`, `train_engine_ids` and the library `versions` it was saved with.
 
